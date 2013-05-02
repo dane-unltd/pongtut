@@ -67,6 +67,7 @@ $(document).ready(function() {
 		ws.binaryType = "arraybuffer";
 		ws.onopen = function() {
 			console.log("connection open")
+			clientFrame()
 		}
 		ws.onmessage = function(evt) {
 			var buf = new DataStream(evt.data)
@@ -100,6 +101,7 @@ $(document).ready(function() {
 					ents[i].model = buf.readUint32()
 					ents[i].mesh = newMesh(ents[i].model,
 							ents[i].size)
+					console.log("new mesh")
 				}
 
 			}
@@ -137,7 +139,7 @@ function clientFrame() {
 	setTimeout(function() {
 		window.requestAnimationFrame(clientFrame);
 
-		for (var i = 0; i<length(ents); i++) {
+		for (var i = 0; i<ents.length; i++) {
 			if (ents[i].mesh) {
 				if (ents[i].pos) {
 					ents[i].mesh.position.set(

@@ -13,7 +13,7 @@ type PlayerId uint32
 type Action uint32
 
 type UserCommand struct {
-	actions uint32
+	Actions uint32
 }
 
 type ClientConn struct {
@@ -35,7 +35,7 @@ func newId() PlayerId {
 }
 
 func active(id PlayerId, action Action) bool {
-	if (clients[id].currentCmd.actions & (1 << action)) > 0 {
+	if (clients[id].currentCmd.Actions & (1 << action)) > 0 {
 		return true
 	}
 	return false
@@ -44,7 +44,7 @@ func active(id PlayerId, action Action) bool {
 func wsHandler(ws *websocket.Conn) {
 	cl := &ClientConn{}
 	cl.ws = ws
-	cl.cmdBuf = make(chan UserCommand)
+	cl.cmdBuf = make(chan UserCommand, 5)
 
 	cmd := UserCommand{}
 
@@ -91,9 +91,14 @@ func main() {
 		case cl := <-newConn:
 			id := newId()
 			clients[id] = cl
+			login(id)
+
 			buf := &bytes.Buffer{}
 			serialize(buf, true)
-			websocket.Message.Send(cl.ws, buf.Bytes())
+			err := websocket.Message.Send(cl.ws, buf.Bytes())
+			if err != nil {
+				log.Println(err)
+			}
 		}
 	}
 }
@@ -105,9 +110,10 @@ func updateInputs() {
 			case cmd := <-cl.cmdBuf:
 				cl.currentCmd = cmd
 			default:
-				break
+				goto done
 			}
 		}
+	done:
 	}
 }
 
@@ -122,10 +128,11 @@ func sendUpdates() {
 		if err != nil {
 			removeList = append(removeList, id)
 			log.Println(err)
-			//disconnect(clients[i].id)
 		}
 	}
+	copyState()
 	for _, id := range removeList {
 		delete(clients, id)
+		disconnect(id)
 	}
 }
