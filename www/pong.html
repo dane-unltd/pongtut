@@ -1,0 +1,165 @@
+<html>
+<head>
+<title>Pong</title>
+<style>
+    body {
+        width: 640px;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+<script src="https://raw.github.com/kig/DataStream.js/master/DataStream.js"></script>
+<script src="http://threejs.org/build/three.min.js"></script>
+
+<script type="text/javascript">
+var actions = 0
+var ws
+var interval = 1000/30;
+var ents = [new Object(),new Object(),new Object()]
+
+var camera, scene, renderer;
+var mat1,mat2
+var cube,sphere
+
+function init3d() {
+	camera = new THREE.PerspectiveCamera( 45, 400/300, 1, 10000 );
+	camera.position.z = 200;
+
+	scene = new THREE.Scene();
+
+	var ambientLight = new THREE.AmbientLight(0x252525);
+	scene.add(ambientLight);
+	var directionalLight = new THREE.DirectionalLight( 0xffffff, 0.9 );
+	directionalLight.position.set( 150, 50, 200 ); 
+	scene.add( directionalLight );
+
+	cube = new THREE.CubeGeometry(1,1,1)
+	sphere = new THREE.SphereGeometry(1,32,16)
+	mat1 = new THREE.MeshLambertMaterial( { color: 0xff0000, shading: THREE.SmoothShading } );
+	mat2 = new THREE.MeshLambertMaterial( { color: 0x00ff00, shading: THREE.SmoothShading } );
+
+	renderer = new THREE.WebGLRenderer();
+	renderer.setSize( 640, 480)
+
+	document.body.appendChild( renderer.domElement);
+}
+
+function newMesh(model,size) {
+	var mesh
+	if (model==2){
+		mesh = new THREE.Mesh(sphere, mat2)
+	}else if (model==1){
+		mesh = new THREE.Mesh(cube, mat1)
+	}
+	mesh.scale.x=size[0]
+	mesh.scale.y=size[1]
+	mesh.scale.z=size[2]
+	scene.add(mesh)
+	return mesh
+}
+
+$(document).ready(function() {
+	if ("WebSocket" in window) {
+		init3d()
+		// Let us open a web socket
+		ws = new WebSocket("ws://"+document.location.host+"/ws/pong");
+		ws.binaryType = "arraybuffer";
+		ws.onopen = function() {
+			console.log("connection open")
+		}
+		ws.onmessage = function(evt) {
+			var buf = new DataStream(evt.data)
+
+			var nEnts = 3
+
+			var bitMask = buf.readUint8()
+			for (var i = 0; i<nEnts; i++) {
+				if ((bitMask & (1<<i))>0) {
+					ents[i].pos = buf.readFloat64Array(3)
+				}
+
+			}
+			var bitMask = buf.readUint8()
+			for (var i = 0; i<nEnts; i++) {
+				if ((bitMask & (1<<i))>0) {
+					ents[i].vel = buf.readFloat64Array(3)
+				}
+
+			}
+			var bitMask = buf.readUint8()
+			for (var i = 0; i<nEnts; i++) {
+				if ((bitMask & (1<<i))>0) {
+					ents[i].size = buf.readFloat64Array(3)
+				}
+
+			}
+			var bitMask = buf.readUint8()
+			for (var i = 0; i<nEnts; i++) {
+				if ((bitMask & (1<<i))>0) {
+					ents[i].model = buf.readUint32()
+					ents[i].mesh = newMesh(ents[i].model,
+							ents[i].size)
+				}
+
+			}
+		}
+		ws.onclose = function() { 
+			console.log("Connection is closed..."); 
+		};
+
+	}else{
+		alert("no websockets on your browser")
+	}
+	document.onkeydown = function(event) {
+		var key_press = String.fromCharCode(event.keyCode);
+		var key_code = event.keyCode;
+		if (key_code == 87) {
+			actions |= 1<<0
+		}
+		if (key_code == 83) {
+			actions |= 1<<1
+		}
+	}
+	document.onkeyup = function(event){
+		var key_press = String.fromCharCode(event.keyCode);
+		var key_code = event.keyCode;
+		if (key_code == 87) {
+			actions &= ~(1<<0)
+		}
+		if (key_code == 83) {
+			actions &= ~(1<<1)
+		}
+	}
+})
+
+function clientFrame() {
+	setTimeout(function() {
+		window.requestAnimationFrame(clientFrame);
+
+		for (var i = 0; i<length(ents); i++) {
+			if (ents[i].mesh) {
+				if (ents[i].pos) {
+					ents[i].mesh.position.set(
+						ents[i].pos[0],
+						ents[i].pos[1],
+						ents[i].pos[2])
+				}
+			}
+		}
+		renderer.render(scene, camera)
+		sendCmd();
+	}, interval);
+}
+
+function sendCmd() {
+	var cmd = new DataStream()
+	cmd.writeUint32(actions)
+	ws.send(cmd.buffer);
+}
+</script>
+
+</head>
+<body>
+</body>
+</html>
