@@ -35,7 +35,7 @@ function init3d() {
 	scene.add( directionalLight );
 
 	cube = new THREE.CubeGeometry(1,1,1)
-	sphere = new THREE.SphereGeometry(1,32,16)
+	sphere = new THREE.SphereGeometry(0.5,32,16)
 	mat1 = new THREE.MeshLambertMaterial( { color: 0xff0000, shading: THREE.SmoothShading } );
 	mat2 = new THREE.MeshLambertMaterial( { color: 0x00ff00, shading: THREE.SmoothShading } );
 
@@ -105,6 +105,20 @@ $(document).ready(function() {
 				}
 
 			}
+			var bitMask = buf.readUint8()
+			for (var i = 0; i<nEnts; i++) {
+				if ((bitMask & (1<<i))>0) {
+					ents[i].score = buf.readUint32()
+					console.log(i,ents[i].score)
+
+					if (i==0) {
+						$("#p1score").html(ents[i].score)
+					} else if (i==1) {
+						$("#p2score").html(ents[i].score)
+					}
+				}
+
+			}
 		}
 		ws.onclose = function() { 
 			console.log("Connection is closed..."); 
@@ -163,5 +177,7 @@ function sendCmd() {
 
 </head>
 <body>
+	<div id="p1score" style="float:left">score1</div>
+	<div id = "p2score" style="float:right;margin-right:10px">score2</div>
 </body>
 </html>
