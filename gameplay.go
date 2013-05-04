@@ -3,8 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
+	"math"
 )
 
 type Model uint32
@@ -22,6 +22,7 @@ const (
 type Entity struct {
 	pos, vel, size Vec
 	model          Model
+	score          uint32
 }
 
 var ents = make([]Entity, 3)
@@ -48,12 +49,98 @@ func copyState() {
 }
 
 func updateSimulation() {
+	processInput()
+	collisionCheck()
 	move()
 }
 
 func move() {
 	for i := range ents {
 		ents[i].pos.Add(&ents[i].pos, &ents[i].vel)
+	}
+}
+
+func processInput() {
+	if players[0] == 0 || players[1] == 0 {
+		return
+	}
+
+	newVel := 0.0
+	if active(players[0], Up) {
+		newVel += 5
+	}
+	if active(players[0], Down) {
+		newVel -= 5
+	}
+	ents[0].vel[1] = newVel
+
+	newVel = 0.0
+	if active(players[1], Up) {
+		newVel += 5
+	}
+	if active(players[1], Down) {
+		newVel -= 5
+	}
+	ents[1].vel[1] = newVel
+}
+
+const FieldHeight = 120
+
+func collisionCheck() {
+	for i := range ents {
+		if ents[i].pos[1] > FieldHeight/2-ents[i].size[1]/2 {
+			ents[i].pos[1] = FieldHeight/2 - ents[i].size[1]/2
+			if ents[i].vel[1] > 0 {
+				ents[i].vel[1] = -ents[i].vel[1]
+			}
+		}
+		if ents[i].pos[1] < -FieldHeight/2+ents[i].size[1]/2 {
+			ents[i].pos[1] = -FieldHeight/2 + ents[i].size[1]/2
+			if ents[i].vel[1] < 0 {
+				ents[i].vel[1] = -ents[i].vel[1]
+			}
+		}
+	}
+
+	rSq := ents[2].size[0] / 2
+	rSq *= rSq
+	for i := 0; i < 2; i++ {
+		//v points from the center of the paddel to the point on the
+		//border of the paddel which is closest to the sphere
+		v := Vec{}
+		v.Sub(&ents[2].pos, &ents[i].pos)
+		v.Clamp(&ents[i].size)
+
+		//d is the vector between the closest points on the paddle and
+		//the sphere
+		d := Vec{}
+		d.Sub(&ents[2].pos, &ents[i].pos)
+		d.Sub(&d, &v)
+
+		distSq := d.Nrm2Sq()
+		if distSq < rSq {
+			//move the sphere in direction of d to remove the
+			//penetration
+			dPos := Vec{}
+			dPos.Scale(math.Sqrt(rSq/distSq)-1, &d)
+			ents[2].pos.Add(&ents[2].pos, &dPos)
+
+			dotPr := Dot(&ents[2].vel, &d)
+			if dotPr < 0 {
+				d.Scale(-2*dotPr/distSq, &d)
+				ents[2].vel.Add(&ents[2].vel, &d)
+			}
+		}
+	}
+
+	if ents[2].pos[0] < -100 {
+		ents[2].pos = Vec{0, 0, 0}
+		ents[2].vel = Vec{2, 3, 0}
+		ents[1].score++
+	} else if ents[2].pos[0] > 100 {
+		ents[2].pos = Vec{0, 0, 0}
+		ents[2].vel = Vec{-2, 3, 0}
+		ents[0].score++
 	}
 }
 
@@ -72,12 +159,9 @@ func login(id PlayerId) {
 }
 
 func startGame() {
-	fmt.Println("game started")
-	ents[0].pos = Vec{-75, 0, 0}
-	ents[1].pos = Vec{75, 0, 0}
-
-	ents[2].pos = Vec{0, 0, 0}
-	ents[2].vel = Vec{10, 0, 0}
+	ents[0].score = 0
+	ents[1].score = 0
+	ents[2].vel = Vec{2, 3, 0}
 }
 
 func disconnect(id PlayerId) {
@@ -91,6 +175,8 @@ func disconnect(id PlayerId) {
 }
 
 func stopGame() {
+	ents[0].pos = Vec{-75, 0, 0}
+	ents[1].pos = Vec{75, 0, 0}
 	ents[2].pos = Vec{0, 0, 0}
 	ents[2].vel = Vec{0, 0, 0}
 }
@@ -135,6 +221,17 @@ func serialize(buf io.Writer, serAll bool) {
 		if serAll || !ent.size.Equals(&entsOld[i].size) {
 			bitMask[0] |= 1 << uint(i)
 			binary.Write(bufTemp, binary.LittleEndian, ent.size)
+		}
+	}
+	buf.Write(bitMask)
+	buf.Write(bufTemp.Bytes())
+
+	bitMask[0] = 0
+	bufTemp.Reset()
+	for i, ent := range ents {
+		if serAll || ent.score != entsOld[i].score {
+			bitMask[0] |= 1 << uint(i)
+			binary.Write(bufTemp, binary.LittleEndian, ent.score)
 		}
 	}
 	buf.Write(bitMask)

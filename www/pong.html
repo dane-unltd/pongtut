@@ -108,6 +108,20 @@ $(document).ready(function() {
 				}
 
 			}
+			var bitMask = buf.readUint8()
+			for (var i = 0; i<nEnts; i++) {
+				if ((bitMask & (1<<i))>0) {
+					ents[i].score = buf.readUint32()
+					console.log(i,ents[i].score)
+
+					if (i==0) {
+						$("#p1score").html(ents[i].score)
+					} else if (i==1) {
+						$("#p2score").html(ents[i].score)
+					}
+				}
+
+			}
 		}
 		ws.onclose = function() { 
 			console.log("Connection is closed..."); 
@@ -155,5 +169,7 @@ function sendCmd() {
 
 </head>
 <body>
+	<div id="p1score" style="float:left">score1</div>
+	<div id = "p2score" style="float:right;margin-right:10px">score2</div>
 </body>
 </html>
