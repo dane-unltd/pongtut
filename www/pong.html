@@ -35,7 +35,7 @@ function init3d() {
 	scene.add( directionalLight );
 
 	cube = new THREE.CubeGeometry(1,1,1)
-	sphere = new THREE.SphereGeometry(1,32,16)
+	sphere = new THREE.SphereGeometry(0.5,32,16)
 	mat1 = new THREE.MeshLambertMaterial( { color: 0xff0000, shading: THREE.SmoothShading } );
 	mat2 = new THREE.MeshLambertMaterial( { color: 0x00ff00, shading: THREE.SmoothShading } );
 
@@ -45,16 +45,13 @@ function init3d() {
 	document.body.appendChild( renderer.domElement);
 }
 
-function newMesh(model,size) {
+function newMesh(model) {
 	var mesh
 	if (model==2){
 		mesh = new THREE.Mesh(sphere, mat2)
 	}else if (model==1){
 		mesh = new THREE.Mesh(cube, mat1)
 	}
-	mesh.scale.x=size[0]
-	mesh.scale.y=size[1]
-	mesh.scale.z=size[2]
 	scene.add(mesh)
 	return mesh
 }
@@ -73,35 +70,41 @@ $(document).ready(function() {
 			var buf = new DataStream(evt.data)
 
 			var nEnts = 3
+            
+			var bitMask = buf.readUint8()
+			for (var i = 0; i<nEnts; i++) {
+				if ((bitMask & (1<<i))>0) {
+                    			var model = buf.readUint32()
+					ents[i] = newMesh(model)
+				}
+			}
 
 			var bitMask = buf.readUint8()
 			for (var i = 0; i<nEnts; i++) {
 				if ((bitMask & (1<<i))>0) {
-					ents[i].pos = buf.readFloat64Array(3)
+                    			var pos = buf.readFloat64Array(3)
+					ents[i].position.x = pos[0]
+					ents[i].position.y = pos[1]
+					ents[i].position.z = pos[2]
 				}
 
 			}
 			var bitMask = buf.readUint8()
 			for (var i = 0; i<nEnts; i++) {
 				if ((bitMask & (1<<i))>0) {
-					ents[i].vel = buf.readFloat64Array(3)
+					var vel = buf.readFloat64Array(3)
+					//On the client, we do not actually do 
+					//anything with the velocity for now ...
 				}
 
 			}
 			var bitMask = buf.readUint8()
 			for (var i = 0; i<nEnts; i++) {
 				if ((bitMask & (1<<i))>0) {
-					ents[i].size = buf.readFloat64Array(3)
-				}
-
-			}
-			var bitMask = buf.readUint8()
-			for (var i = 0; i<nEnts; i++) {
-				if ((bitMask & (1<<i))>0) {
-					ents[i].model = buf.readUint32()
-					ents[i].mesh = newMesh(ents[i].model,
-							ents[i].size)
-					console.log("new mesh")
+					var size = buf.readFloat64Array(3)
+					ents[i].scale.x = size[0]
+					ents[i].scale.y = size[1]
+					ents[i].scale.z = size[2]
 				}
 
 			}
@@ -138,17 +141,6 @@ $(document).ready(function() {
 function clientFrame() {
 	setTimeout(function() {
 		window.requestAnimationFrame(clientFrame);
-
-		for (var i = 0; i<ents.length; i++) {
-			if (ents[i].mesh) {
-				if (ents[i].pos) {
-					ents[i].mesh.position.set(
-						ents[i].pos[0],
-						ents[i].pos[1],
-						ents[i].pos[2])
-				}
-			}
-		}
 		renderer.render(scene, camera)
 		sendCmd();
 	}, interval);

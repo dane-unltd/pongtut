@@ -99,6 +99,17 @@ func serialize(buf io.Writer, serAll bool) {
 	bitMask := make([]byte, 1)
 	bufTemp := &bytes.Buffer{}
 	for i, ent := range ents {
+		if serAll || ent.model != entsOld[i].model {
+			bitMask[0] |= 1 << uint(i)
+			binary.Write(bufTemp, binary.LittleEndian, ent.model)
+		}
+	}
+	buf.Write(bitMask)
+	buf.Write(bufTemp.Bytes())
+
+	bitMask[0] = 0
+	bufTemp.Reset()
+	for i, ent := range ents {
 		if serAll || !ent.pos.Equals(&entsOld[i].pos) {
 			bitMask[0] |= 1 << uint(i)
 			binary.Write(bufTemp, binary.LittleEndian, ent.pos)
@@ -124,17 +135,6 @@ func serialize(buf io.Writer, serAll bool) {
 		if serAll || !ent.size.Equals(&entsOld[i].size) {
 			bitMask[0] |= 1 << uint(i)
 			binary.Write(bufTemp, binary.LittleEndian, ent.size)
-		}
-	}
-	buf.Write(bitMask)
-	buf.Write(bufTemp.Bytes())
-
-	bitMask[0] = 0
-	bufTemp.Reset()
-	for i, ent := range ents {
-		if serAll || ent.model != entsOld[i].model {
-			bitMask[0] |= 1 << uint(i)
-			binary.Write(bufTemp, binary.LittleEndian, ent.model)
 		}
 	}
 	buf.Write(bitMask)
