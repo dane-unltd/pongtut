@@ -70,6 +70,7 @@ $(document).ready(function() {
 			var buf = new DataStream(evt.data)
 
 			var nEnts = 3
+			var nPlayers = 2
             
 			var bitMask = buf.readUint8()
 			for (var i = 0; i<nEnts; i++) {
@@ -108,16 +109,15 @@ $(document).ready(function() {
 				}
 
 			}
-			var bitMask = buf.readUint8()
-			for (var i = 0; i<nEnts; i++) {
-				if ((bitMask & (1<<i))>0) {
-					ents[i].score = buf.readUint32()
-					console.log(i,ents[i].score)
 
+			var bitMask = buf.readUint8()
+			for (var i = 0; i<nPlayers; i++) {
+				if ((bitMask & (1<<i))>0) {
+					var score = buf.readUint32()
 					if (i==0) {
-						$("#p1score").html(ents[i].score)
+						$("#p1score").html(score)
 					} else if (i==1) {
-						$("#p2score").html(ents[i].score)
+						$("#p2score").html(score)
 					}
 				}
 
